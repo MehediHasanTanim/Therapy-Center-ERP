@@ -1,0 +1,24 @@
+# OS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.env
+backend/media/
+
+# Node
+node_modules/
+frontend/dist/
+frontend/.vite/
+
+# IDE
+.vscode/
+.idea/
+
+# Generated TS build artifacts
+*.tsbuildinfo
+frontend/vite.config.js
+frontend/vite.config.d.ts
