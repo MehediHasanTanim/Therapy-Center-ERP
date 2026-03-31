@@ -4,8 +4,13 @@ export const formatDateTime = (iso: string) =>
     timeStyle: "short"
   }).format(new Date(iso));
 
+export const formatDate = (iso: string) =>
+  new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium"
+  }).format(new Date(iso));
+
 export const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-US", {
-    style: "currency",
-    currency: "USD"
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
   }).format(amount);

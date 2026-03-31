@@ -9,6 +9,11 @@ import { SchedulingPage } from "../modules/scheduling/SchedulingPage";
 import { SessionsPage } from "../modules/sessions/SessionsPage";
 import { AssessmentsPage } from "../modules/assessments/AssessmentsPage";
 import { UsersPage } from "../modules/users/UsersPage";
+import { CoreOperationsReportsPage } from "../modules/reports/CoreOperationsReportsPage";
+import { QualityClinicalReportsPage } from "../modules/reports/QualityClinicalReportsPage";
+import { FinancialReportsPage } from "../modules/reports/FinancialReportsPage";
+import { OperationalRiskReportsPage } from "../modules/reports/OperationalRiskReportsPage";
+import { ComplianceAuditReportsPage } from "../modules/reports/ComplianceAuditReportsPage";
 
 export function App() {
   return (
@@ -27,6 +32,11 @@ export function App() {
           <Route path="/scheduling" element={<SchedulingPage />} />
           <Route path="/sessions" element={<SessionsPage />} />
           <Route path="/assessments" element={<AssessmentsPage />} />
+          <Route path="/reports/core-operations" element={<CoreOperationsReportsPage />} />
+          <Route path="/reports/quality-clinical" element={<QualityClinicalReportsPage />} />
+          <Route path="/reports/financial" element={<FinancialReportsPage />} />
+          <Route path="/reports/operational-risk" element={<OperationalRiskReportsPage />} />
+          <Route path="/reports/compliance-audit" element={<ComplianceAuditReportsPage />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/dashboard" replace />} />

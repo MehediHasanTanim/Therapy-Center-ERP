@@ -20,6 +20,12 @@ INSTALLED_APPS = [
     "rest_framework",
     "apps.user_management",
     "apps.patient_management",
+    "apps.employee_management",
+    "apps.therapist_management",
+    "apps.session_management",
+    "apps.payment_management",
+    "apps.dashboard_management",
+    "apps.reports_management",
 ]
 
 MIDDLEWARE = [
@@ -98,3 +104,5 @@ JWT_SECRET_KEY = os.getenv("JWT_SECRET_KEY", SECRET_KEY)
 JWT_ALGORITHM = "HS256"
 JWT_ACCESS_TTL_MINUTES = int(os.getenv("JWT_ACCESS_TTL_MINUTES", "30"))
 JWT_REFRESH_TTL_DAYS = int(os.getenv("JWT_REFRESH_TTL_DAYS", "7"))
+
+DEFAULT_NO_SHOW_REASON = os.getenv("DEFAULT_NO_SHOW_REASON", "No response at door")

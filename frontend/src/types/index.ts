@@ -35,6 +35,7 @@ export interface Therapist {
   id: string;
   fullName: string;
   specialty: string;
+  payoutPercentage?: number;
   availability: AvailabilitySlot[];
 }
 
@@ -53,6 +54,8 @@ export interface SessionEvent {
   endsAt: string;
   status: "scheduled" | "completed" | "cancelled";
   type: "therapy" | "assessment";
+  cancellationReason?: string | null;
+  noShowReason?: string | null;
 }
 
 export interface Payment {

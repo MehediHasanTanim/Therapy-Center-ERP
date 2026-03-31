@@ -3,8 +3,9 @@ import { apiClient } from "./apiClient";
 export interface DashboardStats {
   totalPatients: number;
   totalTherapists: number;
-  upcomingSessions: number;
-  totalRevenue: number;
+  upcomingSessionsToday: number;
+  upcomingSessionsTomorrow: number;
+  revenueCurrentMonth: number;
 }
 
 export const dashboardService = {

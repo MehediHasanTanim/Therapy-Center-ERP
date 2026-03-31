@@ -10,6 +10,7 @@ from apps.patient_management.application.use_cases import PatientManagementUseCa
 from apps.patient_management.domain.entities import PatientDocumentEntity, PatientEntity
 from apps.patient_management.domain.exceptions import NotFoundError, ValidationError
 from apps.patient_management.infrastructure.uow import DjangoUnitOfWork
+from apps.reports_management.infrastructure.models import DocumentActivity
 
 from .permissions import IsTherapyStaffOrAbove
 from .serializers import PatientCreateSerializer, PatientDocumentReadSerializer, PatientDocumentUploadSerializer, PatientReadSerializer, PatientUpdateSerializer
@@ -138,6 +139,14 @@ class PatientViewSet(viewsets.ViewSet):
                 )
             )
             output = PatientDocumentReadSerializer(self._to_document_payload(doc))
+            DocumentActivity.objects.create(
+                user=request.user if request.user.is_authenticated else None,
+                patient_id=doc.patient_id,
+                document_id=doc.id,
+                file_name=doc.file_name,
+                version=doc.version,
+                action="uploaded",
+            )
             return Response(output.data, status=status.HTTP_201_CREATED)
         except NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)
@@ -149,7 +158,18 @@ class PatientViewSet(viewsets.ViewSet):
     @action(detail=True, methods=["delete"], url_path=r"documents/(?P<doc_id>[^/.]+)")
     def delete_document(self, request, pk=None, doc_id=None):
         try:
+            patient = self._use_cases().get_patient(UUID(str(pk)))
+            document = next((doc for doc in patient.documents if str(doc.id) == str(doc_id)), None)
             self._use_cases().delete_document(patient_id=UUID(str(pk)), document_id=UUID(str(doc_id)))
+            if document:
+                DocumentActivity.objects.create(
+                    user=request.user if request.user.is_authenticated else None,
+                    patient_id=document.patient_id,
+                    document_id=document.id,
+                    file_name=document.file_name,
+                    version=document.version,
+                    action="deleted",
+                )
             return Response(status=status.HTTP_204_NO_CONTENT)
         except NotFoundError as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_404_NOT_FOUND)

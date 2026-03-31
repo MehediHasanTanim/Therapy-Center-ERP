@@ -9,10 +9,17 @@ interface NavItem {
   roles: Role[];
 }
 
-interface NavGroup {
-  key: "therapy" | "school";
+interface NavSubGroup {
+  key: string;
   label: string;
   items: NavItem[];
+}
+
+interface NavGroup {
+  key: "therapy" | "school" | "reports";
+  label: string;
+  items?: NavItem[];
+  subGroups?: NavSubGroup[];
 }
 
 const dashboardItem: NavItem = { to: "/dashboard", label: "Dashboard", roles: ["super_admin", "admin", "staff"] };
@@ -34,6 +41,23 @@ const navGroups: NavGroup[] = [
     key: "school",
     label: "School",
     items: []
+  },
+  {
+    key: "reports",
+    label: "Reports",
+    subGroups: [
+      {
+        key: "reports-therapy",
+        label: "Therapy",
+        items: [
+          { to: "/reports/core-operations", label: "Core Operations", roles: ["super_admin", "admin"] },
+          { to: "/reports/quality-clinical", label: "Quality & Clinical", roles: ["super_admin", "admin"] },
+          { to: "/reports/financial", label: "Financial", roles: ["super_admin", "admin"] },
+          { to: "/reports/operational-risk", label: "Operational Risk", roles: ["super_admin", "admin"] },
+          { to: "/reports/compliance-audit", label: "Compliance & Audit", roles: ["super_admin", "admin"] }
+        ]
+      }
+    ]
   }
 ];
 
@@ -41,7 +65,11 @@ export function AppLayout() {
   const { user, logout } = useAuth();
   const [openGroups, setOpenGroups] = useState<Record<NavGroup["key"], boolean>>({
     therapy: true,
-    school: false
+    school: false,
+    reports: false
+  });
+  const [openSubGroups, setOpenSubGroups] = useState<Record<string, boolean>>({
+    "reports-therapy": false
   });
 
   if (!user) return null;
@@ -65,7 +93,7 @@ export function AppLayout() {
           ) : null}
 
           {navGroups.map((group) => {
-            const visibleItems = group.items.filter((item) => item.roles.includes(user.role));
+            const visibleItems = group.items ? group.items.filter((item) => item.roles.includes(user.role)) : [];
             return (
               <div key={group.key} className="nav-group">
                 <button
@@ -77,17 +105,46 @@ export function AppLayout() {
                   <span className={`nav-group-chevron ${openGroups[group.key] ? "open" : ""}`}>›</span>
                 </button>
                 {openGroups[group.key] ? (
-                  visibleItems.length > 0 ? (
-                    <div className="nav-group-items">
-                      {visibleItems.map((item) => (
-                        <NavLink key={item.to} className={({ isActive }) => `nav-item sub ${isActive ? "active" : ""}`} to={item.to}>
-                          {item.label}
-                        </NavLink>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="nav-empty">No modules yet</p>
-                  )
+                  <div className="nav-group-items">
+                    {visibleItems.map((item) => (
+                      <NavLink key={item.to} className={({ isActive }) => `nav-item sub ${isActive ? "active" : ""}`} to={item.to}>
+                        {item.label}
+                      </NavLink>
+                    ))}
+                    {(group.subGroups ?? []).map((subGroup, index) => {
+                      const visibleSubItems = subGroup.items.filter((item) => item.roles.includes(user.role));
+                      if (visibleSubItems.length === 0) return null;
+                      return (
+                        <div key={subGroup.key} className="nav-group nested">
+                          {index === 0 && visibleItems.length > 0 ? <div className="nav-sub-divider" /> : null}
+                          <button
+                            className="nav-group-trigger"
+                            type="button"
+                            onClick={() => setOpenSubGroups((prev) => ({ ...prev, [subGroup.key]: !prev[subGroup.key] }))}
+                          >
+                            <span>{subGroup.label}</span>
+                            <span className={`nav-group-chevron ${openSubGroups[subGroup.key] ? "open" : ""}`}>›</span>
+                          </button>
+                          {openSubGroups[subGroup.key] ? (
+                            <div className="nav-group-items">
+                              {visibleSubItems.map((item) => (
+                                <NavLink
+                                  key={item.to}
+                                  className={({ isActive }) => `nav-item sub ${isActive ? "active" : ""}`}
+                                  to={item.to}
+                                >
+                                  {item.label}
+                                </NavLink>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                      );
+                    })}
+                    {visibleItems.length === 0 && (group.subGroups ?? []).length === 0 ? (
+                      <p className="nav-empty">No modules yet</p>
+                    ) : null}
+                  </div>
                 ) : null}
               </div>
             );

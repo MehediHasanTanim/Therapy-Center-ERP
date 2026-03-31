@@ -1,15 +1,19 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import toast from "react-hot-toast";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { ActionIconButton } from "../../components/ui/ActionIconButton";
-import { therapistService } from "../../services/therapistService";
+import { therapistService, TherapistSortKey } from "../../services/therapistService";
 import { Therapist } from "../../types";
+
+const getErrorMessage = (error: any, fallback: string) =>
+  error?.response?.data?.detail ?? error?.response?.data?.message ?? fallback;
 
 interface TherapistForm {
   fullName: string;
   specialty: string;
+  payoutPercentage: number;
   selectedDays: string[];
   sameTimeForAllDays: boolean;
   commonStartHour: string;
@@ -17,7 +21,7 @@ interface TherapistForm {
   dayTimes: Record<string, { startHour: string; endHour: string }>;
 }
 
-type SortKey = "fullName" | "specialty";
+type SortKey = TherapistSortKey;
 
 const dayLabels: Record<number, string> = {
   0: "Sun",
@@ -42,6 +46,7 @@ const buildInitialDayTimes = () =>
 const emptyForm: TherapistForm = {
   fullName: "",
   specialty: "Speech Therapist",
+  payoutPercentage: 70,
   selectedDays: ["1"],
   sameTimeForAllDays: true,
   commonStartHour: "09:00",
@@ -51,8 +56,6 @@ const emptyForm: TherapistForm = {
 
 export function TherapistsPage() {
   const queryClient = useQueryClient();
-  const { data: therapists } = useQuery({ queryKey: ["therapists"], queryFn: therapistService.list });
-  const allTherapists = therapists ?? [];
 
   const [showEnrollModal, setShowEnrollModal] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
@@ -69,40 +72,31 @@ export function TherapistsPage() {
   const [sortKey, setSortKey] = useState<SortKey>("fullName");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
 
+  const { data: therapistPageData } = useQuery({
+    queryKey: ["therapists", "paged", currentPage, pageSize, searchQuery, specialtyFilter, sortKey, sortOrder],
+    queryFn: () =>
+      therapistService.listPaged({
+        page: currentPage,
+        pageSize,
+        search: searchQuery.trim(),
+        specialty: specialtyFilter,
+        sortBy: sortKey,
+        sortOrder
+      })
+  });
+  const paginatedTherapists = therapistPageData?.items ?? [];
+  const totalPages = therapistPageData?.totalPages ?? 1;
+  const safePage = therapistPageData?.page ?? currentPage;
+  const totalTherapists = therapistPageData?.total ?? 0;
+  const startIndex = totalTherapists === 0 ? 0 : (safePage - 1) * pageSize;
+
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, specialtyFilter, pageSize]);
-
-  const filteredTherapists = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    return allTherapists.filter((therapist) => {
-      const matchesSpecialty = specialtyFilter === "all" || therapist.specialty === specialtyFilter;
-      if (!query) return matchesSpecialty;
-      const searchable = `${therapist.fullName} ${therapist.specialty}`.toLowerCase();
-      return matchesSpecialty && searchable.includes(query);
-    });
-  }, [allTherapists, searchQuery, specialtyFilter]);
-
-  const sortedTherapists = useMemo(() => {
-    const sorted = [...filteredTherapists];
-    sorted.sort((a, b) => {
-      const left = String(a[sortKey] ?? "");
-      const right = String(b[sortKey] ?? "");
-
-      if (left.toLowerCase() < right.toLowerCase()) return sortOrder === "asc" ? -1 : 1;
-      if (left.toLowerCase() > right.toLowerCase()) return sortOrder === "asc" ? 1 : -1;
-      return 0;
-    });
-    return sorted;
-  }, [filteredTherapists, sortKey, sortOrder]);
-
-  const totalPages = Math.max(1, Math.ceil(sortedTherapists.length / pageSize));
-  const safePage = Math.min(currentPage, totalPages);
-  const startIndex = (safePage - 1) * pageSize;
-  const paginatedTherapists = sortedTherapists.slice(startIndex, startIndex + pageSize);
+  }, [searchQuery, specialtyFilter, pageSize, sortKey, sortOrder]);
 
   const refreshData = () => {
     queryClient.invalidateQueries({ queryKey: ["therapists"] });
+    queryClient.invalidateQueries({ queryKey: ["therapists", "paged"] });
     queryClient.invalidateQueries({ queryKey: ["dashboard"] });
   };
 
@@ -114,11 +108,22 @@ export function TherapistsPage() {
       setShowEnrollModal(false);
       refreshData();
     },
-    onError: () => toast.error("Unable to enroll therapist")
+    onError: (error) => toast.error(getErrorMessage(error, "Unable to enroll therapist"))
   });
 
   const updateMutation = useMutation({
-    mutationFn: ({ therapistId, payload }: { therapistId: string; payload: { fullName: string; specialty: string; availability: Array<{ dayOfWeek: number; startHour: string; endHour: string }> } }) =>
+    mutationFn: ({
+      therapistId,
+      payload
+    }: {
+      therapistId: string;
+      payload: {
+        fullName: string;
+        specialty: string;
+        payoutPercentage: number;
+        availability: Array<{ dayOfWeek: number; startHour: string; endHour: string }>;
+      };
+    }) =>
       therapistService.update(therapistId, payload),
     onSuccess: () => {
       toast.success("Therapist updated");
@@ -126,7 +131,7 @@ export function TherapistsPage() {
       setEditTherapist(null);
       refreshData();
     },
-    onError: () => toast.error("Unable to update therapist")
+    onError: (error) => toast.error(getErrorMessage(error, "Unable to update therapist"))
   });
 
   const deleteMutation = useMutation({
@@ -135,7 +140,7 @@ export function TherapistsPage() {
       toast.success("Therapist deleted");
       refreshData();
     },
-    onError: () => toast.error("Unable to delete therapist")
+    onError: (error) => toast.error(getErrorMessage(error, "Unable to delete therapist"))
   });
 
   const onSort = (key: SortKey) => {
@@ -161,6 +166,7 @@ export function TherapistsPage() {
     createMutation.mutate({
       fullName: form.fullName,
       specialty: form.specialty,
+      payoutPercentage: form.payoutPercentage,
       availability: form.selectedDays.map((day) => ({
         dayOfWeek: Number(day),
         startHour: form.sameTimeForAllDays ? form.commonStartHour : form.dayTimes[day].startHour,
@@ -182,6 +188,7 @@ export function TherapistsPage() {
     setForm({
       fullName: therapist.fullName,
       specialty: therapist.specialty,
+      payoutPercentage: therapist.payoutPercentage ?? 70,
       selectedDays: therapist.availability.map((slot) => String(slot.dayOfWeek)),
       sameTimeForAllDays,
       commonStartHour: firstAvailability.startHour,
@@ -224,7 +231,8 @@ export function TherapistsPage() {
             Specialty
             <select className="select" value={specialtyFilter} onChange={(e) => setSpecialtyFilter(e.target.value)}>
               <option value="all">All</option>
-              {Array.from(new Set(allTherapists.map((therapist) => therapist.specialty)))
+              {specialtyOptions
+                .slice()
                 .sort((a, b) => a.localeCompare(b))
                 .map((option) => (
                 <option key={option} value={option}>
@@ -294,7 +302,7 @@ export function TherapistsPage() {
 
         <div className="pagination-row">
           <p>
-            Showing {filteredTherapists.length === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, filteredTherapists.length)} of {filteredTherapists.length}
+            Showing {totalTherapists === 0 ? 0 : startIndex + 1}-{Math.min(startIndex + pageSize, totalTherapists)} of {totalTherapists}
           </p>
           <div className="actions-row">
             <button className="icon-btn" disabled={safePage <= 1} onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}>
@@ -337,6 +345,18 @@ export function TherapistsPage() {
                     </option>
                   ))}
                 </select>
+              </label>
+              <label>
+                Payout Percentage
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  value={form.payoutPercentage}
+                  onChange={(e) => setForm((f) => ({ ...f, payoutPercentage: Number(e.target.value) }))}
+                />
               </label>
               <fieldset className="checkbox-group">
                 <legend>Availability Days</legend>
@@ -456,6 +476,9 @@ export function TherapistsPage() {
               <strong>Specialty:</strong> {viewTherapist.specialty}
             </p>
             <p>
+              <strong>Payout %:</strong> {viewTherapist.payoutPercentage ?? 70}%
+            </p>
+            <p>
               <strong>Availability:</strong>{" "}
               {viewTherapist.availability.length === 0
                 ? "-"
@@ -487,6 +510,7 @@ export function TherapistsPage() {
                   payload: {
                     fullName: form.fullName,
                     specialty: form.specialty,
+                    payoutPercentage: form.payoutPercentage,
                     availability: form.selectedDays.map((day) => ({
                       dayOfWeek: Number(day),
                       startHour: form.sameTimeForAllDays ? form.commonStartHour : form.dayTimes[day].startHour,
@@ -509,6 +533,18 @@ export function TherapistsPage() {
                     </option>
                   ))}
                 </select>
+              </label>
+              <label>
+                Payout Percentage
+                <input
+                  className="input"
+                  type="number"
+                  min={0}
+                  max={100}
+                  step={0.01}
+                  value={form.payoutPercentage}
+                  onChange={(e) => setForm((f) => ({ ...f, payoutPercentage: Number(e.target.value) }))}
+                />
               </label>
               <fieldset className="checkbox-group">
                 <legend>Availability Days</legend>

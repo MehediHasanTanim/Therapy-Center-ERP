@@ -78,6 +78,16 @@ class InMemoryPatientRepository(PatientRepository):
         self.items[patient_id] = replace(patient, documents=list(self.documents[patient_id]), updated_at=datetime.utcnow())
         return entity
 
+    def delete_document(self, *, patient_id, document_id):
+        docs = self.documents.get(patient_id, [])
+        original_len = len(docs)
+        docs = [doc for doc in docs if doc.id != document_id]
+        self.documents[patient_id] = docs
+        patient = self.items.get(patient_id)
+        if patient is not None:
+            self.items[patient_id] = replace(patient, documents=list(docs), updated_at=datetime.utcnow())
+        return len(docs) != original_len
+
 
 class InMemoryUoW(AbstractUnitOfWork):
     def __init__(self):
